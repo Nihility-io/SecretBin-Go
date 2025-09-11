@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	// List of possible errors returned by the SecretBin API
+	// List of possible errors returned by the SecretBin API.
 	ErrInvalidExpirationTime = &SecretBinError{Name: "InvalidExpirationTime"}
 	ErrSecretNotFound        = &SecretBinError{Name: "SecretNotFoundError"}
 	ErrSecretAlreadyExists   = &SecretBinError{Name: "SecretAlreadyExistsError"}

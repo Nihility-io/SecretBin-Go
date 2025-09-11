@@ -2,6 +2,12 @@ package secretbin
 
 import (
 	"fmt"
+
+	"github.com/Masterminds/semver/v3"
+)
+
+var (
+	minCBORVersion = semver.MustParse("2.1.0")
 )
 
 type Client interface {
@@ -15,6 +21,7 @@ type Client interface {
 type client struct {
 	endpoint string
 	config   *Config
+	useCBOR  bool // Use CBOR instead of JSON+Base64 if using SecretBin v2.1.0 or newer
 }
 
 // New creates a new SecretBin client for the given endpoint.
@@ -35,19 +42,24 @@ func New(endpoint string) (Client, error) {
 	c.config = &Config{
 		Name:           config.Branding.AppName,
 		Endpoint:       c.endpoint,
-		Version:        info.Version,
+		Version:        semver.MustParse(info.Version),
 		DefaultExpires: config.Defaults.Expires,
 	}
+
 	if banner := config.Banner; banner.Enabled {
 		c.config.Banner = &Banner{
 			Type: banner.Type,
 			Text: banner.Text["en"],
 		}
 	}
+
 	c.config.Expires = config.Expires
 	if c.config.Expires == nil {
 		c.config.Expires = map[string]Expires{}
 	}
+
+	// Use CBOR if using SecretBin v2.1.0 or newer
+	c.useCBOR = c.config.Version.GreaterThanEqual(minCBORVersion)
 
 	return &c, nil
 }
@@ -82,13 +94,15 @@ func (c *client) SubmitSecret(secret Secret, options Options) (string, error) {
 	// Validate the expiration time against the server's available options.
 	if _, ok := c.config.Expires[options.Expires]; !ok {
 		return "", &SecretBinError{
-			Name:    ErrInvalidExpirationTime.Name,
-			Message: fmt.Sprintf("Invalid expiration time '%s'. Valid options are: %v", options.Expires, c.config.ExpireOptionsSorted()),
+			Name: ErrInvalidExpirationTime.Name,
+			Message: fmt.Sprintf(
+				"Invalid expiration time '%s'. Valid options are: %v",
+				options.Expires, c.config.ExpireOptionsSorted()),
 		}
 	}
 
 	// Encrypt the secret with the provided password and return the key and encrypted data.
-	key, enc, err := secret.encrypted(options.Password)
+	key, data, dataBytes, err := secret.encrypted(options.Password, c.useCBOR)
 	if err != nil {
 		return "", err
 	}
@@ -98,7 +112,8 @@ func (c *client) SubmitSecret(secret Secret, options Options) (string, error) {
 		Expires:           options.Expires,
 		BurnAfter:         int(options.BurnAfter),
 		PasswordProtected: options.Password != "",
-		Data:              enc,
+		Data:              data,
+		DataBytes:         dataBytes,
 	}
 
 	// The SecretBin API uses -1 to indicate no burn after reading.
@@ -109,7 +124,7 @@ func (c *client) SubmitSecret(secret Secret, options Options) (string, error) {
 	}
 
 	// Post the secret to the SecretBin server and retrieve the result.
-	r, err := c.postSecret(&pl)
+	r, err := c.postSecret(&pl, c.useCBOR)
 	if err != nil {
 		return "", err
 	}

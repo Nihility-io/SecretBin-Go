@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/fxamacker/cbor/v2"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -60,7 +61,7 @@ func (s *Secret) AddFileAttachment(path string) error {
 }
 
 // encrypted encrypts the secret content using AES-256-GCM and returns the base58 encoded key and a crypto URL.
-func (s *Secret) encrypted(password string) (string, string, error) {
+func (s *Secret) encrypted(password string, useCBOR bool) (string, string, []byte, error) {
 	// Attachments is not allowed to be nil by the SecretBin API, so we ensure it is initialized
 	if s.Attachments == nil {
 		s.Attachments = []*Attachment{}
@@ -74,28 +75,38 @@ func (s *Secret) encrypted(password string) (string, string, error) {
 		}
 	}
 
-	// Marshal the secret content to JSON
-	data, err := json.Marshal(s)
+	// Marshal the secret content to JSON/CBOR
+	var (
+		data []byte
+		err  error
+	)
+
+	if useCBOR {
+		data, err = cbor.Marshal(s)
+	} else {
+		data, err = json.Marshal(s)
+	}
+
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	// A random base key which is used to derive the actual key for AES encryption
 	baseKey := make([]byte, 32)
 	if _, err := rand.Read(baseKey); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	// Generate a random IV (initialization vector) for AES-GCM
 	iv := make([]byte, 12)
 	if _, err := rand.Read(iv); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	// Generate a random salt for the PBKDF2 key derivation
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	// Set the number of iterations for PBKDF2 as recommended by OWASP
@@ -106,12 +117,12 @@ func (s *Secret) encrypted(password string) (string, string, error) {
 	// Create a new AES cipher using the derived key
 	c, err := aes.NewCipher(key)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	aead, err := cipher.NewGCM(c)
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	// Encrypt the data using AES-GCM
@@ -119,8 +130,23 @@ func (s *Secret) encrypted(password string) (string, string, error) {
 
 	// Create the crypto URL with the necessary parameters
 	// This includes the algorithm, key algorithm, nonce (IV), salt, iterations, and
-	cryptoURL := fmt.Sprintf("crypto://?algorithm=AES256-GCM&key-algorithm=pbkdf2&nonce=%s&salt=%s&iter=%d&hash=SHA-512#", base58.Encode(iv), base58.Encode(salt), iter) + base64.StdEncoding.EncodeToString(enc)
+	var (
+		cryptoURL string
+		dataBytes []byte
+	)
+
+	if useCBOR {
+		cryptoURL = fmt.Sprintf(
+			"crypto://?algorithm=AES256-GCM&key-algorithm=pbkdf2&nonce=%s&salt=%s&iter=%d&hash=SHA-512#",
+			base58.Encode(iv), base58.Encode(salt), iter)
+		dataBytes = enc
+	} else {
+		cryptoURL = fmt.Sprintf(
+			"crypto://?algorithm=AES256-GCM&key-algorithm=pbkdf2&nonce=%s&salt=%s&iter=%d&hash=SHA-512#",
+			base58.Encode(iv), base58.Encode(salt), iter) + base64.StdEncoding.EncodeToString(enc)
+		dataBytes = nil
+	}
 
 	// Encode the base key in base58 for the URL
-	return base58.Encode(baseKey), cryptoURL, nil
+	return base58.Encode(baseKey), cryptoURL, dataBytes, nil
 }

@@ -5,12 +5,14 @@ import (
 	"iter"
 	"maps"
 	"slices"
+
+	"github.com/Masterminds/semver/v3"
 )
 
 type Config struct {
 	Name           string             // Name of the SecretBin instance
 	Endpoint       string             // Endpoint URL of the SecretBin server
-	Version        string             // Version of the SecretBin server
+	Version        *semver.Version    // Version of the SecretBin server
 	Banner         *Banner            // Optional banner displayed by the server
 	Expires        map[string]Expires // Available expiration options for secrets
 	DefaultExpires string             // Default expiration option for secrets
@@ -24,6 +26,7 @@ func (c *Config) ExpiresSorted() iter.Seq2[string, Expires] {
 			if c.Expires[a].Seconds < c.Expires[b].Seconds {
 				return -1
 			}
+
 			return 1
 		})
 		for _, k := range valid {
@@ -41,8 +44,10 @@ func (c *Config) ExpireOptionsSorted() []string {
 		if c.Expires[a].Seconds < c.Expires[b].Seconds {
 			return -1
 		}
+
 		return 1
 	})
+
 	return valid
 }
 
@@ -63,5 +68,6 @@ func (e Expires) String() string {
 	if e.Count > 1 {
 		s = "s"
 	}
+
 	return fmt.Sprintf("%d %s%s (%ds)", e.Count, e.Unit, s, e.Seconds)
 }

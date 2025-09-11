@@ -8,7 +8,9 @@ import "github.com/Nihility-io/SecretBin-Go/v2"
 
 ## Index
 
+- [Constants](<#constants>)
 - [Variables](<#variables>)
+- [func GeneratePassword\(options PasswordOptions\) \(string, error\)](<#GeneratePassword>)
 - [type Attachment](<#Attachment>)
 - [type Banner](<#Banner>)
 - [type Client](<#Client>)
@@ -19,6 +21,7 @@ import "github.com/Nihility-io/SecretBin-Go/v2"
 - [type Expires](<#Expires>)
   - [func \(e Expires\) String\(\) string](<#Expires.String>)
 - [type Options](<#Options>)
+- [type PasswordOptions](<#PasswordOptions>)
 - [type Secret](<#Secret>)
   - [func \(s \*Secret\) AddAttachment\(name string, contentType string, data \[\]byte\)](<#Secret.AddAttachment>)
   - [func \(s \*Secret\) AddFileAttachment\(path string\) error](<#Secret.AddFileAttachment>)
@@ -27,13 +30,26 @@ import "github.com/Nihility-io/SecretBin-Go/v2"
   - [func \(e \*SecretBinError\) Is\(target error\) bool](<#SecretBinError.Is>)
 
 
+## Constants
+
+<a name="Uppercase"></a>
+
+```go
+const (
+    Uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    Lowercase = "abcdefghijklmnopqrstuvwxyz"
+    Digits    = "0123456789"
+    Symbols   = "~!@#%&*_-+=,.<>?"
+)
+```
+
 ## Variables
 
 <a name="ErrInvalidExpirationTime"></a>
 
 ```go
 var (
-    // List of possible errors returned by the SecretBin API
+    // List of possible errors returned by the SecretBin API.
     ErrInvalidExpirationTime = &SecretBinError{Name: "InvalidExpirationTime"}
     ErrSecretNotFound        = &SecretBinError{Name: "SecretNotFoundError"}
     ErrSecretAlreadyExists   = &SecretBinError{Name: "SecretAlreadyExistsError"}
@@ -48,8 +64,27 @@ var (
 )
 ```
 
+<a name="ErrInvalidPasswordLength"></a>
+
+```go
+var (
+    ErrInvalidPasswordLength = errors.New("invalid password length; must be greater than 6")
+    ErrInvalidCharacterSet   = errors.New(
+        "at least one character set (uppercase, lowercase, digits, symbols) must be selected")
+)
+```
+
+<a name="GeneratePassword"></a>
+## func [GeneratePassword](<https://github.com/Nihility-io/SecretBin-Go/blob/main/password.go#L35>)
+
+```go
+func GeneratePassword(options PasswordOptions) (string, error)
+```
+
+GeneratePassword generates a secure random password based on the provided options. It ensures that at least one character from each selected set is included. If no character sets are selected or the length is below 6, it returns an error.
+
 <a name="Attachment"></a>
-## type [Attachment](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L25-L29>)
+## type [Attachment](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L26-L30>)
 
 
 
@@ -62,7 +97,7 @@ type Attachment struct {
 ```
 
 <a name="Banner"></a>
-## type [Banner](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L49-L52>)
+## type [Banner](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L54-L57>)
 
 
 
@@ -74,7 +109,7 @@ type Banner struct {
 ```
 
 <a name="Client"></a>
-## type [Client](<https://github.com/Nihility-io/SecretBin-Go/blob/main/secretbin.go#L7-L13>)
+## type [Client](<https://github.com/Nihility-io/SecretBin-Go/blob/main/secretbin.go#L13-L19>)
 
 
 
@@ -89,7 +124,7 @@ type Client interface {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/Nihility-io/SecretBin-Go/blob/main/secretbin.go#L22>)
+### func [New](<https://github.com/Nihility-io/SecretBin-Go/blob/main/secretbin.go#L29>)
 
 ```go
 func New(endpoint string) (Client, error)
@@ -98,7 +133,7 @@ func New(endpoint string) (Client, error)
 New creates a new SecretBin client for the given endpoint. It retrieves the API information and configuration from the server to initialize the client.
 
 <a name="Config"></a>
-## type [Config](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L10-L17>)
+## type [Config](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L12-L19>)
 
 
 
@@ -106,7 +141,7 @@ New creates a new SecretBin client for the given endpoint. It retrieves the API 
 type Config struct {
     Name           string             // Name of the SecretBin instance
     Endpoint       string             // Endpoint URL of the SecretBin server
-    Version        string             // Version of the SecretBin server
+    Version        *semver.Version    // Version of the SecretBin server
     Banner         *Banner            // Optional banner displayed by the server
     Expires        map[string]Expires // Available expiration options for secrets
     DefaultExpires string             // Default expiration option for secrets
@@ -114,7 +149,7 @@ type Config struct {
 ```
 
 <a name="Config.ExpireOptionsSorted"></a>
-### func \(\*Config\) [ExpireOptionsSorted](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L38>)
+### func \(\*Config\) [ExpireOptionsSorted](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L41>)
 
 ```go
 func (c *Config) ExpireOptionsSorted() []string
@@ -123,7 +158,7 @@ func (c *Config) ExpireOptionsSorted() []string
 ExpiresOptionsSorted returns a slice of expiration option names sorted by their duration.
 
 <a name="Config.ExpiresSorted"></a>
-### func \(\*Config\) [ExpiresSorted](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L20>)
+### func \(\*Config\) [ExpiresSorted](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L22>)
 
 ```go
 func (c *Config) ExpiresSorted() iter.Seq2[string, Expires]
@@ -132,7 +167,7 @@ func (c *Config) ExpiresSorted() iter.Seq2[string, Expires]
 ExpiresSorted returns an iterator that yields expiration options sorted by their duration.
 
 <a name="Expires"></a>
-## type [Expires](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L54-L58>)
+## type [Expires](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L59-L63>)
 
 
 
@@ -145,7 +180,7 @@ type Expires struct {
 ```
 
 <a name="Expires.String"></a>
-### func \(Expires\) [String](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L61>)
+### func \(Expires\) [String](<https://github.com/Nihility-io/SecretBin-Go/blob/main/config.go#L66>)
 
 ```go
 func (e Expires) String() string
@@ -154,7 +189,7 @@ func (e Expires) String() string
 String returns a human\-readable representation of the expiration option.
 
 <a name="Options"></a>
-## type [Options](<https://github.com/Nihility-io/SecretBin-Go/blob/main/secretbin.go#L55-L68>)
+## type [Options](<https://github.com/Nihility-io/SecretBin-Go/blob/main/secretbin.go#L67-L80>)
 
 
 
@@ -175,8 +210,23 @@ type Options struct {
 }
 ```
 
+<a name="PasswordOptions"></a>
+## type [PasswordOptions](<https://github.com/Nihility-io/SecretBin-Go/blob/main/password.go#L24-L30>)
+
+PasswordOptions defines the options for generating a password.
+
+```go
+type PasswordOptions struct {
+    Uppercase bool
+    Lowercase bool
+    Digits    bool
+    Symbols   bool
+    Length    int
+}
+```
+
 <a name="Secret"></a>
-## type [Secret](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L20-L23>)
+## type [Secret](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L21-L24>)
 
 
 
@@ -188,7 +238,7 @@ type Secret struct {
 ```
 
 <a name="Secret.AddAttachment"></a>
-### func \(\*Secret\) [AddAttachment](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L33>)
+### func \(\*Secret\) [AddAttachment](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L34>)
 
 ```go
 func (s *Secret) AddAttachment(name string, contentType string, data []byte)
@@ -197,7 +247,7 @@ func (s *Secret) AddAttachment(name string, contentType string, data []byte)
 AddAttachment adds an attachment to the secret content. If the content type is not provided, it will be guessed based on the file extension.
 
 <a name="Secret.AddFileAttachment"></a>
-### func \(\*Secret\) [AddFileAttachment](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L51>)
+### func \(\*Secret\) [AddFileAttachment](<https://github.com/Nihility-io/SecretBin-Go/blob/main/content.go#L52>)
 
 ```go
 func (s *Secret) AddFileAttachment(path string) error
